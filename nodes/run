@@ -31,11 +31,12 @@ class Obstacle():
 		while not rospy.is_shutdown():
 			try:
 				self.get_scan()
+				print(min(self.scan_filter))
 				self.twist.linear.x = 0.0
 				self.twist.angular.z = 0.0
 				self._cmd_pub.publish(self.twist)
 			except KeyboardInterrupt:
-				stop(
+				stop()
 
 def stop():
 	print('Stopping robot')
