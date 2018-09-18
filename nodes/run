@@ -3,20 +3,62 @@
 # Author : Chayapol Piyaphakdeesakun
 
 import rospy
-from sensor_msgs.msg import LaserScan
+from sensor_msgs.msg import LaserScan, BatteryState, MagneticField
 from geometry_msgs.msg import Twist
+from nav_msgs.msg import Odometry
 import atexit
+import time
+import math
 
 pub = ''
 
-class Obstacle():
+def process_laser(data,robot):
+	robot.laser = []
+	for i in range(360):
+		robot.laser.append(data.ranges[i])
+
+def process_battery_state(data,robot):
+	if robot.battery_state == None:
+		print('Battery Voltage: {}'.format(data.voltage))
+		print('Battery Percent: {}'.format(data.percentage))
+	robot.battery_state = data
+	robot.batterySubscriber.unregister()
+
+def process_magnetic_field(data,robot):
+#	print(data)
+	angle = math.atan2(data.magnetic_field.y,data.magnetic_field.x)/math.pi*180.0
+#	print(angle)
+	robot.magnetic_angle = angle
+
+def process_odometer(data,robot):
+	#print(data)
+	pass
+
+class Robot():
+	robot_list = []
 	def __init__(self):
+		Robot.robot_list.append(self)
 		self.LIDAR_ERR = 0.05
 		self._cmd_pub = rospy.Publisher('cmd_vel', Twist, queue_size=10)
 		global pub
 		pub = self._cmd_pub
-		self.obstacle()
+		self.laser = [0]*360
+		self.odom = None
+		self.magnetic_angle = 0
+		self.battery_state = None
 
+		self.laserSubscriber = rospy.Subscriber("scan", LaserScan, callback=process_laser, callback_args=self)
+		self.batterySubscriber = rospy.Subscriber("battery_state", BatteryState, callback=process_battery_state, callback_args=self)
+		self.magneticFieldSubscriber = rospy.Subscriber("magnetic_field", MagneticField, callback=process_magnetic_field, callback_args=self)
+		#self.odometerSubscriber = rospy.Subscriber("odom", Odometry, callback=process_odometer, callback_args=self)
+
+	def terminate(self):
+		self.laserSubscriber.unregister()
+		self.batterySubscriber.unregister()
+		self.magneticFieldSubscriber.unregister()
+#		self.odometerSubscriber.unregister()
+
+	'''
 	def get_scan(self):
 		msg = rospy.wait_for_message("scan", LaserScan)
 		self.scan_filter = []
@@ -32,12 +74,12 @@ class Obstacle():
 			try:
 				self.get_scan()
 				print(min(self.scan_filter))
-				self.twist.linear.x = 0.0
-				self.twist.angular.z = 0.0
+				self.twist.linear.x = 0.05
+				self.twist.angular.z = 0.05
 				self._cmd_pub.publish(self.twist)
 			except KeyboardInterrupt:
 				stop()
-
+	'''
 def stop():
 	print('Stopping robot')
 	twist = Twist()
@@ -45,14 +87,25 @@ def stop():
 	twist.angular.z = 0.0
 	pub = rospy.Publisher('cmd_vel', Twist, queue_size=1)
 	pub.publish(twist)
+	for bot in Robot.robot_list:
+		bot.terminate()
 
 def main():
+	atexit.register(stop)
 	rospy.init_node('run')
 	rospy.on_shutdown(stop)
 	try:
-		obstacle = Obstacle()
+		robot = Robot()
+		while not rospy.is_shutdown():
+			try:
+				twist = Twist()
+				twist.linear.x = 0.00
+				twist.angular.z = 0.05
+				pub.publish(twist)
+				time.sleep(1)
+			except KeyboardInterrupt:
+				stop()
 	except rospy.ROSInterruptException:
 		pass
 if __name__ == '__main__':
-	atexit.register(stop)
 	main()
