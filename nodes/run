@@ -10,8 +10,6 @@ import atexit
 import time
 import math
 
-pub = ''
-
 def process_laser(data,robot):
 	robot.laser = []
 	for i in range(360):
@@ -36,9 +34,7 @@ class Robot():
 	def __init__(self):
 		Robot.robot_list.append(self)
 		self.LIDAR_ERR = 0.05
-		self._cmd_pub = rospy.Publisher('cmd_vel', Twist, queue_size=10)
-		global pub
-		pub = self._cmd_pub
+		self.cmd_vel_publisher = rospy.Publisher('cmd_vel', Twist, queue_size=10)
 		self.laser = [0]*360
 		self.odom = None
 		self.magnetic_angle = 0
@@ -48,6 +44,12 @@ class Robot():
 		self.batterySubscriber = rospy.Subscriber("battery_state", BatteryState, callback=process_battery_state, callback_args=self)
 		self.magneticFieldSubscriber = rospy.Subscriber("magnetic_field", MagneticField, callback=process_magnetic_field, callback_args=self)
 		self.odometerSubscriber = rospy.Subscriber("odom", Odometry, callback=process_odometer, callback_args=self)
+
+	def sendMotionCommand(self, linear, angular):
+		twist = Twist()
+		twist.linear.x = linear
+		twist.angular.z = angular
+		self.cmd_vel_publisher.publish(twist)
 
 	def terminate(self):
 		self.laserSubscriber.unregister()
@@ -71,13 +73,13 @@ def main():
 	rospy.on_shutdown(stop)
 	try:
 		robot = Robot()
+		rate = rospy.Rate(10) #Control the rate of command send in unit of Hz
+
+		##Write your robot control program here
 		while not rospy.is_shutdown():
 			try:
-				twist = Twist()
-				twist.linear.x = 0.00
-				twist.angular.z = 0.05
-				pub.publish(twist)
-				time.sleep(1)
+				robot.sendMotionCommand(0.00,0.05)
+				rate.sleep()	#pause the program to maintain command rate
 			except KeyboardInterrupt:
 				stop()
 	except rospy.ROSInterruptException:
