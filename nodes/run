@@ -11,9 +11,21 @@ import time
 import math
 
 def process_laser(data,robot):
-	robot.laser = []
+	#process data obtained from scan topic
+	range_min = data.range_min
+	range_max = data.range_max
+	laser = []
+	laser_clipped = []
 	for i in range(360):
-		robot.laser.append(data.ranges[i])
+		laser.append(data.ranges[i])
+		if data.ranges[i] < range_min:
+			laser_clipped.append(range_min)
+		elif data.range[i] > range_max:
+			laser_clipped.append(range_max)
+		else:
+			laser_clipped.append(data.range[i])
+	robot.laser = laser
+	robot.laser_clipped = laser_clipped
 
 def process_battery_state(data,robot):
 	if robot.battery_state == None:
@@ -35,7 +47,8 @@ class Robot():
 		Robot.robot_list.append(self)
 		self.LIDAR_ERR = 0.05
 		self.cmd_vel_publisher = rospy.Publisher('cmd_vel', Twist, queue_size=10)
-		self.laser = [0]*360
+		self.laser = [0.0]*360
+		self.laser_clipped = [0.0]*360
 		self.odom = None
 		self.magnetic_angle = 0
 		self.battery_state = None
@@ -46,6 +59,8 @@ class Robot():
 		self.odometerSubscriber = rospy.Subscriber("odom", Odometry, callback=process_odometer, callback_args=self)
 
 	def sendMotionCommand(self, linear, angular):
+		##linear: translational speed of the robot in m/s
+		##angular: rotational speed of the robot in rad/s
 		twist = Twist()
 		twist.linear.x = linear
 		twist.angular.z = angular
