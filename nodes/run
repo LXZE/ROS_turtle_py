@@ -7,7 +7,6 @@ from sensor_msgs.msg import LaserScan, BatteryState
 from geometry_msgs.msg import Twist
 from nav_msgs.msg import Odometry
 
-valueLaser = [0.0]*360
 valueLaserRaw = {
 	'range_min':0.0,
 	'range_max':0.0,
@@ -15,10 +14,10 @@ valueLaserRaw = {
 	}
 valueBatteryState = None
 valueOdometry = {
-	'position':{'x':0.0,'y':0.0,'z':0.0},
-	'orientation':{'x':0.0,'y':0.0,'z':0.0,'w':1.0},
-	'linearVelocity':{'x':0.0,'y':0.0,'z':0.0},
-	'angularVelocity':{'x':0.0,'y':0.0,'z':0.0},
+	'position':None,	#Datatype: geometry_msg/Point	(x,y,z)
+	'orientation':None,	#Datatype: geometry_msg/Quaternion	(x,y,z,w)
+	'linearVelocity':None,	#Datatype: geometry_msg/Vector3	(x,y,z)
+	'angularVelocity':None,	#Datatype: geometry_msg/Vector3	(x,y,z)
 	}
 cmd_vel_publisher = None
 subscribers = []
@@ -28,7 +27,7 @@ def initRosNode():
 	global subscribers
 	rospy.init_node('turtlebot3Controller',anonymous=True)
 	rospy.on_shutdown(terminateRosNode)
-	cmd_vel_publisher = rospy.Publisher('cmd_vel',Twist,queue_size=10)
+	cmd_vel_publisher = rospy.Publisher('cmd_vel',Twist,queue_size=1)
 	subscribers.append(rospy.Subscriber('scan',LaserScan,callback=scanSubscriberCallback))
 	subscribers.append(rospy.Subscriber('battery_state',BatteryState,callback=batteryStateSubscriberCallback))
 	subscribers.append(rospy.Subscriber('odom',Odometry,callback=odomSubscriberCallback))
@@ -44,24 +43,24 @@ def sendOdometryReset():
 	raise NotImplementedError()
 
 def scanSubscriberCallback(message):
-	global valueLaser
+	#message's datatype: sensor_msg/LaserScan
 	global valueLaserRaw
+	
+	##TODO: process the received values to remove obviously error values
 	rawLaser = {
 		'range_min':message.range_min,
 		'range_max':message.range_max,
 		'ranges':list(message.ranges),
 		}
-	laser = map(lambda x: x if x>message.range_min else message.range_min, message.ranges)
-	laser = map(lambda x: x if x<message.range_max else message.range_max, laser)
-	laser = list(laser)
-	valueLaser = laser
 	valueLaserRaw = rawLaser
 
 def batteryStateSubscriberCallback(message):
+	#message's datatype: sensor_msgs/BatteryState
 	global valueBatteryState
 	valueBatteryState = message
 
 def odomSubscriberCallback(message):
+	#message's datatype: nav_msgs/Odometry.msg
 	global valueOdometry
 	valueOdometry = {
 		'position':message.pose.pose.position,
@@ -82,7 +81,6 @@ def terminateRosNode():
 		sub.unregister()
 
 def main():
-	global valueLaser
 	global valueLaserRaw
 	global valueBatteryState
 	global valueOdometry
@@ -93,12 +91,14 @@ def main():
 			pass
 		batteryState = valueBatteryState	#copy sensor value before use
 		print('BatteryVoltage: {}'.format(batteryState.voltage))
-		##Write your robot control program here
+		##TODO: Write your robot control program here (run once)
 
 		while not rospy.is_shutdown():
 			try:
 				rate.sleep()	#pause the program to maintain command rate
+				##TODO: Write your robot control program here (run repeatly)
 				publishVelocityCommand(0.00,0.05)
+				print(valueOdometry)
 			except KeyboardInterrupt:
 				terminateRosNode()
 	except rospy.ROSInterruptException:
